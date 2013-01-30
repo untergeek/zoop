@@ -39,8 +39,8 @@ class zoop:
     def login(self):
         """Do API login"""
         try:
-            self.api = ZabbixAPI(server=url)
-            self.api.login(username, password)
+            self.api = ZabbixAPI(server=self.url)
+            self.api.login(self.username, self.password)
         except Exception, e:
             exitOnException(e)
     
