@@ -53,3 +53,7 @@ Basic class structure and usage:
 #LICENSE:
 
 The license is Apache 2.0.  I didn't simply fork the Python Zabbix API because it's under the LGPL, and I don't like the LGPL.
+
+#Footnote:
+Yes, I do realize that zoop is Pythonic.  In the "Election Night Special" clip on "The Final Rip Off" the
+"silly candidate" was named Elsie Zoooooooop!
