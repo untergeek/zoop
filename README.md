@@ -21,13 +21,13 @@ Basic class structure and usage:
 
 #item (dict)
 
-*Methods
+* Methods
 
 - get
 - create
 - etc.
 
-*The item object is itself a dictionary, so you can call or populate it like a dictionary:
+* The item object is itself a dictionary, so you can call or populate it like a dictionary:
 
 - self["hostid"]
 - self["itemid"]
@@ -36,13 +36,13 @@ Basic class structure and usage:
 
 #host (dict)
 
-*Methods
+* Methods
 
 - get
 - create
 - etc.
 
-*A host object is itself a dictionary, so you can call or populate it like a dictionary:
+* A host object is itself a dictionary, so you can call or populate it like a dictionary:
 
 - self["hostid"]
 - self["host"] 
@@ -51,7 +51,7 @@ Basic class structure and usage:
 
 #Module dependencies:
 
-*Python Zabbix API:
+* Python Zabbix API:
 
 - https://github.com/gescheit/scripts (in particular, zabbix_api.py)
 
