@@ -92,7 +92,7 @@ class zoop:
         def exists(self):
             """Simply put, it exists or it doesn't. Can't go wrong with hostid, no ambiguity."""
             try:
-                retval = zoop.item.api.item.exists({"key_":self["key_"],"hostids":self["hostid"]})
+                retval = zoop.item.api.item.exists({"key_":self["key_"],"hostid":self["hostid"]})
             except Exception, e:
                 exitOnException(e)
             return retval
@@ -111,16 +111,11 @@ class zoop:
 
         def itemkeycheck(self):
             """Strips out items defined as type None, and makes sure the required dict keys are present afterwards (i.e., none were stripped because they were still 'None' type"""
-            print "Self currently looks like this: "
-            print self
 
             for k in list(self.keys()):
                 if self[k] is None:
                     del(self[k])
 
-            print "Now self looks like this: "
-            print self
-                
             requiredkeys = [ "hostid", "interfaceid", "history", "delay", "name", "key_", "type", "value_type", "applications" ]
             retval = True
             for key in requiredkeys:
@@ -147,10 +142,10 @@ class zoop:
                         # Something about "self" won't allow JSON to serialize, so I'll pass all of the keys here.  The passed value-object works.
                         for k,v in self.iteritems():
                             ItemObject[k] = v
-#                        print "second = ", ItemObject
                         retval = zoop.item.api.item.create(ItemObject)
                 except Exception, e:
-                    exitOnException(e)
+                    print "Failed to create Zabbix item"
+                    retval = False
                 return retval
             else: 
                 print "Error! Item already exists on hostid " + str(self['hostid']) + " with key " + self['key_']
