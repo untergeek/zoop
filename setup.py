@@ -20,7 +20,7 @@ setup(
     author='Aaron Mildenstein',
     author_email='aaron@mildensteins.com',
     description='Zabbix Object Oriented Python',
-    long_description=read('README'),
+    long_description=read('README.md'),
     py_modules=['zoop'],
     include_package_data=True,
     zip_safe=False,
