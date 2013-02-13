@@ -1,12 +1,9 @@
 import sys
+import logging
 from zabbix_api import ZabbixAPI
 from UserDict import UserDict
 from UserList import UserList
 
-
-def exitOnException(msg):
-    print "Error %s:" % msg.args[0]
-    sys.exit(2)
 
 
 class zoopError(Exception):
@@ -19,15 +16,32 @@ class zoopError(Exception):
 class zoop:
     """Outermost class for all nested classes"""
 
-    def __init__(self, url=None, username=None, password=None):
+    def __init__(self, url=None, username=None, password=None, logLevel=None, logfile=None):
         if not (url and username and password):
             raise zoopError("Valid url, username and password must be passed at instance creation.")
-            sys.exit(2)
-        self.url = url
-        self.username = username
-        self.password = password
-        # Populate these values in these subclasses so they are filled.
-        self.connect()
+        else:
+            self.logconfig(logLevel, logfile)
+            self.url = url
+            self.username = username
+            self.password = password
+            # Populate these values in these subclasses so they are filled.
+            self.connect()
+
+
+    def logconfig(self, logLevel, logfile):
+        if logfile is None:
+            log_hndlr = logging.StreamHandler(sys.stdout)
+        else:
+            try:
+                log_hndlr = logging.FileHandler(logfile)
+            except:
+                log_hndlr = logging.StreamHandler(sys.stdout)
+        self.logger = logging.getLogger("zoop.%s" % self.__class__.__name__)
+        self.logger.addHandler(log_hndlr)
+
+        if logLevel is None:
+            logLevel = "WARNING"
+        self.logger.setLevel(logLevel)
 
 
     def connect(self):
@@ -42,7 +56,8 @@ class zoop:
             self.api = ZabbixAPI(server=self.url)
             self.api.login(self.username, self.password)
         except Exception, e:
-            exitOnException(e)
+            raise zoopError("Unable to log in with provided credentials.")
+            self.debug(logging.ERROR, "Unable to log in with provided credentials. Error %s" % e.args[0])
     
 
     def version(self):
@@ -57,8 +72,11 @@ class zoop:
     def fillInnerClassesAPI(self):
         """Fill the inner classes API values"""
         zoop.host.api = self.api
+        zoop.host.logger = self.logger
         zoop.hostinterface.api = self.api
+        zoop.hostinterface.logger = self.logger
         zoop.item.api = self.api
+        zoop.item.logger = self.logger
             
 
     class item(UserDict):
@@ -80,8 +98,8 @@ class zoop:
             for k in mydict.iterkeys():
                 # Check for null responses and mismatching hostids
                 if k is "hostid" and self[k] is not mydict[k]:
-                    print "Error: hostid mismatch!"
-                    sys.exit(2)
+                    zoop.item.debug(logging.ERROR, "ERROR: hostid mismatch!")
+                    raise zoopError("Error: hostid mismatch!")
                 elif not mydict[k]:
                     self[k] = ''
                 # Otherwise add them to the dict
@@ -94,7 +112,8 @@ class zoop:
             try:
                 retval = zoop.item.api.item.exists({"key_":self["key_"],"hostid":self["hostid"]})
             except Exception, e:
-                exitOnException(e)
+                zoop.item.debug(logging.ERROR, "Item not found with key_:%s and hostid:%s" % self["key_"], str(self["hostid"]))
+                retval = False
             return retval
     
         
@@ -106,7 +125,8 @@ class zoop:
                 if self.exists():
                     self.fill_item_dict(zoop.item.api.item.get({"output":"extend","hostids":(hostid),"filter":{"key_":(key_)}})[0])
             except Exception, e:
-                exitOnException(e)
+                zoop.item.debug(logging.ERROR, "Unable to populate item!")
+                raise zoopError("Error %s:" % e.args[0])
     
 
         def itemkeycheck(self):
@@ -129,8 +149,8 @@ class zoop:
                 for k in self.iterkeys():
                     print k, self[k]
             except Exception, e:
-                print "Error: Unable to iterate through dict keys."
-                print e
+                zoop.item.debug(logging.ERROR, "Error: Unable to iterate through dict keys.")
+                raise zoopError("Error %s:" % e.args[0])
     
     
         def create(self):
@@ -144,11 +164,11 @@ class zoop:
                             ItemObject[k] = v
                         retval = zoop.item.api.item.create(ItemObject)
                 except Exception, e:
-                    print "Failed to create Zabbix item"
+                    zoop.item.debug(logging.ERROR, "Failed to create Zabbix item")
                     retval = False
                 return retval
             else: 
-                print "Error! Item already exists on hostid " + str(self['hostid']) + " with key " + self['key_']
+                zoop.item.debug(logging.WARNING, "Error! Item already exists on hostid " + str(self['hostid']) + " with key " + self['key_'])
     
     
     
@@ -174,9 +194,9 @@ class zoop:
                     elif iftype == 4:
                         retval = "jmx"
                 else:
-                    print "Error: Provided interface value could not be mapped."
+                    zoop.hostinterface.debug(logging.ERROR, "Unable to map integer iftype (%s) to string." % str(iftype))
             except Exception, e:
-                exitOnException(e)
+                raise zoopError("Error: %s" % e.args[0])
             return retval
         
         
@@ -201,9 +221,9 @@ class zoop:
                     else:
                         retval = None
                 else:
-                    print "Error: Provided interface value could not be mapped."
+                    zoop.hostinterface.debug(logging.ERROR, "Error: Provided interface value (%s) could not be mapped." % str(iftype))
             except Exception, e:
-                exitOnException(e)
+                raise zoopError("Error: %s" % e.args[0])
             return retval
         
 
@@ -214,12 +234,12 @@ class zoop:
             mydict['dns'] = dns if dns else None
             mydict['ip'] = ip if ip else None
             if not hostid and not dns and not ip:
-                print "FAIL: Must provide one of hostid, dns or ip"
-                sys.exit(2)
+                zoop.hostinterface.debug(logging.ERROR, "FAIL: Must provide one of hostid, dns or ip")
+                raise zoopError("Error: %s" % e.args[0])
             try:
                 return zoop.hostinterface.api.hostinterface.exists(mydict)
             except Exception, e:
-                exitOnException(e)
+                raise zoopError("Error: %s" % e.args[0])
     
         
         def get(self, hostid=None):
@@ -230,7 +250,8 @@ class zoop:
                     for result in results:
                         self.append(result)
             except Exception, e:
-                exitOnException(e)
+                zoop.hostinterface.debug(logging.ERROR, "Error trying to get host interface data for host with id %s." % str(hostid))
+                raise zoopError("Error: %s" % e.args[0])
     
     
         def agent(self, hostid=None):
@@ -239,14 +260,16 @@ class zoop:
                 try:
                     self.get(hostid)
                 except Exception, e:
-                    exitOnException(e)
+                    zoop.hostinterface.debug(logging.ERROR, "Unable to get host interface information for hostid %s." % str(hostid))
+                    raise zoopError("Error: %s" % e.args[0])
             try:
                 for entry in self:
                     retval = entry["interfaceid"] if entry["type"] == "1" and entry["main"] == "1" else None
                     if retval:
                         break
             except Exception, e:
-                exitOnException(e)
+                zoop.hostinterface.debug(logging.ERROR, "Unable to find agent interface for host with hostid %s." % str(hostid))
+                raise zoopError("Error: %s" % e.args[0])
     
             return retval
     
@@ -262,8 +285,8 @@ class zoop:
                             print "    ", k, entry[k]
                     print
             except Exception, e:
-                print "Error: Unable to iterate through dict keys."
-                print e
+                zoop.hostinterface.debug(logging.ERROR, "Error: Unable to iterate through dict keys.")
+                raise zoopError("Error: %s" % e.args[0])
     
     
     
@@ -306,12 +329,12 @@ class zoop:
                     mykey = 'name'
                 else:
                     # This should never happen
-                    print "Error: No host, hostid or name provided"
-                    sys.exit(2)
+                    zoop.host.debug("Error: No host, hostid or name provided")
+                    raise zoopError("Error: %s" % e.args[0])
                 retval = zoop.host.api.host.exists({mykey:self[mykey]})
     
             except Exception, e:
-                exitOnException(e)
+                raise zoopError("Error: %s" % e.args[0])
             return retval
         
     
@@ -319,7 +342,7 @@ class zoop:
             try:
                 retval = zoop.host.api.application.exists({"name":appname,"hostid":self['hostid']})
             except Exception, e:
-                exitOnException(e)
+                raise zoopError("Error: %s" % e.args[0])
             return retval
     
     
@@ -330,7 +353,7 @@ class zoop:
                 else:
                     retval = False
             except Exception, e:
-                exitOnException(e)
+                raise zoopError("Error: %s" % e.args[0])
             return retval
     
     
@@ -341,7 +364,7 @@ class zoop:
                 else:
                     retval = False
             except Exception, e:
-                exitOnException(e)
+                raise zoopError("Error: %s" % e.args[0])
             return retval
     
     
@@ -360,19 +383,17 @@ class zoop:
                         mykey = 'name'
                     else:
                         # This should never happen
-                        print "Error: You have no host or hostid."
-                        sys.exit(2)
+                        zoop.host.debug("Error: You have no host or hostid.")
         
                     test = zoop.host.api.host.get({"filter":{mykey:self[mykey]},"output":"extend"})
                     if len(test) == 1:
                         self.fill_host_dict(test)
                     else: 
-                        print "ERROR: More than one matching entry found for zoop.host.api.host.get!"
-                        sys.exit(2)
+                        zoop.host.debug("ERROR: More than one matching entry found for zoop.host.api.host.get!")
                 except Exception, e:
-                    exitOnException(e)
+                    raise zoopError("Error: %s" % e.args[0])
             else:
-                print "Can't perform get. Host does not exist!"
+                zoop.host.debug(logging.ERROR, "Can't perform get. Host does not exist!")
     
     
         def show(self):
@@ -380,7 +401,7 @@ class zoop:
                 for k in self.iterkeys():
                     print k, self[k]
             except Exception, e:
-                print "Error: Unable to iterate through dict keys."
-                print e
+                zoop.host.debug(logging.ERROR, "Error: Unable to iterate through dict keys.")
+                raise zoopError("Error: %s" % e.args[0])
                  
 
